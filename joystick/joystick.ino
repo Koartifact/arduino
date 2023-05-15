@@ -2,81 +2,92 @@
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int joystick_x = 0;
-int joystick_y = 1;
-int attack_button = 7;
+int joystickButton = 7;
+bool isJumping = false;
+unsigned long obstacleTimer = 0;
+int obstaclePosition = 15;
 
-int playerX = 8;
-int playerY = 1;
+void createCustomChars() {
+  byte frame1[8] = {
+    0b00100,
+    0b01110,
+    0b00100,
+    0b01110,
+    0b10101,
+    0b00100,
+    0b01010,
+    0b10001
+  };
 
-int obstacleX = 15;
-int obstacleY = 0;
+  byte frame2[8] = {
+    0b00100,
+    0b01110,
+    0b00100,
+    0b01110,
+    0b10101,
+    0b00100,
+    0b10001,
+    0b01010
+  };
 
-unsigned long prevMillis = 0;
-unsigned long prevMillisAI = 0;
+  lcd.createChar(1, frame1);
+  lcd.createChar(2, frame2);
+}
 
 void setup() {
   lcd.init();
   lcd.backlight();
-  pinMode(attack_button, INPUT_PULLUP);
-  randomSeed(analogRead(0));
+  createCustomChars();
+  pinMode(joystickButton, INPUT_PULLUP);
 }
 
 void loop() {
-  int x = analogRead(joystick_x);
-  int y = analogRead(joystick_y);
-  int attack = digitalRead(attack_button);
-
-  if (x < 400) playerX--;
-  if (x > 600) playerX++;
-  if (y < 400) playerY--;
-  if (y > 600) playerY++;
-
-  playerX = constrain(playerX, 0, 15);
-  playerY = constrain(playerY, 0, 1);
+  unsigned long currentTime = millis();
+  if (currentTime - obstacleTimer > 1000) {
+    obstacleTimer = currentTime;
+    obstaclePosition--;
+    if (obstaclePosition < 0) {
+      obstaclePosition = 15;
+    }
+  }
 
   lcd.clear();
-  lcd.setCursor(playerX, playerY);
+  if (digitalRead(joystickButton) == LOW) {
+    isJumping = true;
+  } else {
+    isJumping = false;
+  }
+
+  if (isJumping) {
+    lcd.setCursor(1, 0);
+  } else {
+    lcd.setCursor(1, 1);
+  }
+  lcd.write(byte(1));
+
+  lcd.setCursor(obstaclePosition, 1);
   lcd.print("*");
 
-  lcd.setCursor(obstacleX, obstacleY);
-  lcd.print("#");
+  delay(150);
 
-  if (playerX == obstacleX && playerY == obstacleY) {
+  lcd.clear();
+  if (isJumping) {
+    lcd.setCursor(1, 0);
+  } else {
+    lcd.setCursor(1, 1);
+  }
+  lcd.write(byte(2));
+
+  lcd.setCursor(obstaclePosition, 1);
+  lcd.print("*");
+
+  if (obstaclePosition == 2 && !isJumping) {
     lcd.clear();
     lcd.setCursor(4, 0);
     lcd.print("Game Over");
-    delay(3000);
-    playerX = 8;
-    playerY = 1;
-    obstacleX = 15;
-    obstacleY = random(0, 2);
+    delay(2000);
+    obstaclePosition = 15;
   }
 
-  if (attack == LOW && abs(playerX - obstacleX) <= 1 && playerY == obstacleY) {
-    obstacleX = 15;
-    obstacleY = random(0, 2);
-  }
-
-  unsigned long currentMillis = millis();
-  if (currentMillis - prevMillis >= 500) {
-    prevMillis = currentMillis;
-    obstacleX--;
-    if (obstacleX < 0) {
-      obstacleX = 15;
-      obstacleY = random(0, 2);
-    }
-  }
-
-  // AI for obstacle to follow the player on Y axis
-  if (currentMillis - prevMillisAI >= 1000) {
-    prevMillisAI = currentMillis;
-    if (obstacleY < playerY) {
-      obstacleY++;
-    } else if (obstacleY > playerY) {
-      obstacleY--;
-    }
-  }
-
-  delay(100);
+  delay(150);
 }
